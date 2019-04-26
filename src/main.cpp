@@ -1,18 +1,20 @@
 #include <stdio.h>
 
+#ifdef EMSCRIPTEN
 #include <emscripten.h>
+#endif
 
 #include "stl.h"
 
 #ifdef EMSCRIPTEN
-#error emscripten
+#define BASE_PATH "/indexdb/"
+#define EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define BASE_PATH "./"
+#define EXPORT
 #endif
 
-extern "C" {
-void make_stl();
-}
-
-void EMSCRIPTEN_KEEPALIVE make_stl() {
+extern "C" void EXPORT make_stl() {
     using namespace io_stl;
 
     float z = +0.0;
@@ -57,22 +59,25 @@ void EMSCRIPTEN_KEEPALIVE make_stl() {
     } );
     stl.SetTextHeader( "STL File" );
 
-    FILE* f = fopen( "/indexdb/mycube.stl", "wb" );
+    FILE* f = fopen( BASE_PATH "mycube.stl", "wb" );
     if( f ) {
         stl.WriteBinary( f );
         fclose( f );
 
+#ifdef EMSCRIPTEN
         EM_ASM(
             FS.syncfs( false, function( err ) {
                 assert( !err );
                 console.log( "Synced /indexdb contents." );
             } ); );
+#endif
     } else {
         fprintf( stderr, "Failed to open STL file for writing.\n" );
     }
 }
 
-int main() {
+int main( int, char** ) {
+#ifdef EMSCRIPTEN
     EM_ASM(
         FS.mkdir( '/indexdb' );
         FS.mount( IDBFS, {}, '/indexdb' );
@@ -83,4 +88,7 @@ int main() {
             ccall( 'make_stl', 'v' );
         } ); );
     emscripten_exit_with_live_runtime();
+#else
+    make_stl();
+#endif
 }
