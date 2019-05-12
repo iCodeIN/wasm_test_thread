@@ -1,7 +1,10 @@
 #include <cstdlib>
-#include <emscripten.h>
 #include <pthread.h>
 #include <stdio.h>
+
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif // EMSCRIPTEN
 
 pthread_mutex_t lock;
 
@@ -33,12 +36,22 @@ int main() {
         return -1;
     }
 
+    pthread_t thread[2];
     for( unsigned int i = 0; i < 2; ++i ) {
-        pthread_t thread;
-        if( pthread_create( &thread, nullptr, crack, static_cast<void*>( new unsigned int( i ) ) ) ) {
+        if( pthread_create( thread + i, nullptr, crack, static_cast<void*>( new unsigned int( i ) ) ) ) {
             fprintf( stderr, "Failed to start thread.\n" );
         }
     }
+
+// Emscripten needs to fall through and exit main.
+#ifndef EMSCRIPTEN
+    // Wait for thread that will never exit.
+    for( unsigned int i = 0; i < 2; ++i ) {
+        if( pthread_join( thread[i], nullptr ) ) {
+            fprintf( stderr, "Failed to join thread.\n" );
+        }
+    }
+#endif // EMSCRIPTEN
 
     return 0;
 }
